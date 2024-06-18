@@ -2,6 +2,10 @@
 name = "kintai"
 version = "0.1.0"
 edition = "2021"
+description = "simple kintai time management system"
+authors = ["yochidros <yoshiki.myzw@gmail.com>"]
+readme = "README.md"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
