@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Days, Duration, Local, NaiveDate};
+use chrono::{DateTime, Days, Duration, Local, NaiveDate};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -44,16 +44,38 @@ impl TimeTracker {
                 }
             } else {
                 println!("Error: No start entry found for today.");
-                let dt = NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap();
-                match dt.checked_sub_days(Days::new(1)) {
-                    Some(yesterday) => self.stop(yesterday.to_string().as_str()),
-                    None => {
-                        println!("Error: No start entry found for yesterday too.");
-                    }
-                };
             }
         } else {
             println!("Error: No entries found for this date.");
+            let dt = NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap();
+            match dt.checked_sub_days(Days::new(1)) {
+                Some(yesterday) => self.stop(yesterday.to_string().as_str()),
+                None => {
+                    println!("Error: No start entry found for yesterday too.");
+                }
+            };
+        }
+    }
+    fn fetch_latest(&self, date: &str) -> Option<&(DateTime<Local>, Option<DateTime<Local>>)> {
+        if let Some(entries) = self.records.get(date) {
+            entries.last().filter(|&last| last.1.is_none())
+        } else {
+            let dt = NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap();
+            match dt.checked_sub_days(Days::new(1)) {
+                Some(yesterday) => self.fetch_latest(yesterday.to_string().as_str()),
+                None => None,
+            }
+        }
+    }
+
+    fn working(&self, date: &str) {
+        if let Some(entry) = self.fetch_latest(date) {
+            let now = Local::now();
+            let duration: Duration = now - entry.0;
+            let hours = duration.num_minutes() as f64 / 60.0;
+            println!("current working {:.2} hours", hours);
+        } else {
+            println!("Not working now");
         }
     }
 
@@ -100,6 +122,7 @@ struct Cli {
 enum Commands {
     Start,
     Stop,
+    Current,
     Summary,
 }
 fn main() -> std::io::Result<()> {
@@ -109,19 +132,27 @@ fn main() -> std::io::Result<()> {
 
     let today = Local::now().format("%Y-%m-%d").to_string();
 
-    let mut savefile = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(cli.file_path)?;
     match &cli.command {
         Commands::Start => {
             tracker.start(&today);
+            let mut savefile = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(cli.file_path)?;
             tracker.save(&mut savefile)?
         }
         Commands::Stop => {
             tracker.stop(&today);
+            let mut savefile = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(cli.file_path)?;
             tracker.save(&mut savefile)?
+        }
+        Commands::Current => {
+            tracker.working(&today);
         }
         Commands::Summary => {
             tracker.summary();
